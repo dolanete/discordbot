@@ -1,9 +1,11 @@
 from typing import Final
 import os
 from dotenv import load_dotenv
-from discord import Intents, Attachment
+from discord import Intents
 from discord.ext import commands
 import responses  # Import responses for command handling
+import database
+
 
 # Load token
 load_dotenv()
@@ -23,8 +25,9 @@ async def add_quest(ctx, *, args: str):
 # Command to list quests
 @bot.command(name='listquests')
 async def list_quests(ctx):
-    response = responses.handle_listquests()
-    await ctx.send(response)
+    response_chunks = responses.handle_listquests()
+    for chunk in response_chunks:
+        await ctx.send(chunk)
 
 # Command to import quests from a CSV file
 @bot.command(name='importcsv')
@@ -34,6 +37,22 @@ async def import_csv(ctx):
         await responses.import_csv_from_attachment(ctx, attachment)
     else:
         await ctx.send("Please attach a CSV file with the command.")
+
+# Command for users to submit proof for a quest
+@bot.command(name='submit')
+async def submit_quest(ctx, quest_id: int):
+    try:
+        # Get the submitting user's name
+        user_name = ctx.author.name
+
+        # Use the append_scorer function from the database module
+        result = database.append_scorer(quest_id, user_name)
+
+        # Send the result of the operation to the Discord channel
+        await ctx.send(result)
+    except Exception as e:
+        await ctx.send(f"An error occurred: {e}")
+
 
 # Bot startup event
 @bot.event

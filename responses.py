@@ -7,26 +7,42 @@ async def handle_addquest(args: str) -> str:
     try:
         quest_details = args.split(",")
 
-        if len(quest_details) == 5:
+        if len(quest_details) == 5:  # Now expects only five parameters
             quest_name = quest_details[0].strip()
             points = int(quest_details[1].strip())
             scorer = quest_details[2].strip()
             proof = quest_details[3].strip()
-            valid = quest_details[4].strip().lower() in ("true", "1", "yes")
+            difficulty = quest_details[4].strip()  # Difficulty column instead of valid
 
-            # Add quest with boolean `valid` field
-            database.add_quest(quest_name, points, scorer, proof, valid)
-            return f'Quest "{quest_name}" added with {points} points by {scorer}. Valid: {"Yes" if valid else "No"}'
+            # Add quest to the database
+            database.add_quest(quest_name, points, scorer, proof, difficulty)
+            return f'Quest "{quest_name}" added with {points} points by {scorer}. Difficulty: {difficulty}'
         else:
-            return "Invalid command format. Use: !addquest quest_name, points, scorer, proof, valid"
+            return "Invalid command format. Use: !addquest quest_name, points, scorer, proof, difficulty"
     except ValueError:
         return "Invalid command format. Ensure points is a number and format is correct."
 
-def handle_listquests() -> str:
+def handle_listquests() -> list:
     quests = database.get_quests()
-    return "Quest List:\n" + "\n".join(
-        [f"{q[0]}: {q[1]}, Points: {q[2]}, Scorer: {q[3]}, Proof: {q[4]}" for q in quests]
-    )
+    quest_list = [
+        f"{q[1]} (ID: {q[0]}), Points: {q[2]}, Scorer: {q[3]}, Proof: {q[4]}, Difficulty: {q[5]}"
+        for q in quests
+    ]
+    
+    # Combine quests into chunks of up to 2000 characters
+    response_chunks = []
+    chunk = ""
+    for quest in quest_list:
+        if len(chunk) + len(quest) + 1 > 2000:  # Add 1 for the newline character
+            response_chunks.append(chunk)
+            chunk = ""
+        chunk += quest + "\n"
+    
+    # Add the last chunk if it's not empty
+    if chunk:
+        response_chunks.append(chunk)
+    
+    return response_chunks
 
 async def import_csv_from_attachment(ctx, attachment):
     if not attachment.filename.endswith('.csv'):
@@ -47,9 +63,9 @@ async def import_csv_from_attachment(ctx, attachment):
                 # Safely extract each field, using default values for missing fields
                 quest_name = row.get('Quests', '').strip()
                 points = row.get('Points', '0').strip()  # Default to '0' if missing
-                scorer = row.get('Scorer', '').strip() or "Unknown"
+                scorer = row.get('Scorer', '').strip() or "Unclaimed"
                 proof = row.get('Proof', '').strip() or "N/A"
-                valid = row.get('Valid', 'false').strip().lower() in ("true", "1", "yes")
+                difficulty = row.get('Difficulty', '').strip()  # New Difficulty column
 
                 # Try to parse points as an integer, defaulting to 0 if not a valid integer
                 try:
@@ -58,7 +74,7 @@ async def import_csv_from_attachment(ctx, attachment):
                     points = 0  # Default to 0 if parsing fails
 
                 # Add the quest to the database
-                database.add_quest(quest_name, points, scorer, proof, valid)
+                database.add_quest(quest_name, points, scorer, proof, difficulty)
 
             await ctx.send("Data imported successfully from CSV.")
     except Exception as e:
@@ -66,3 +82,6 @@ async def import_csv_from_attachment(ctx, attachment):
     finally:
         # Clean up by deleting the temporary CSV file
         os.remove(csv_path)
+
+def handle_submit(quest_id: int, user_name: str, proof_link: str) -> str:
+    return database.submit_proof(quest_id, user_name, proof_link)
