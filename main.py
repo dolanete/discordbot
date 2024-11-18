@@ -40,13 +40,13 @@ async def import_csv(ctx):
 
 # Command for users to submit proof for a quest
 @bot.command(name='submit')
-async def submit_quest(ctx, quest_id: int):
+async def submit_quest(ctx, quest_id: int, link: str):
     try:
         # Get the submitting user's name
         user_name = ctx.author.name
 
         # Use the append_scorer function from the database module
-        result = database.append_scorer(quest_id, user_name)
+        result = database.append_scorer_and_proof(quest_id, user_name, link)
 
         # Send the result of the operation to the Discord channel
         await ctx.send(result)

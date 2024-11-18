@@ -55,37 +55,48 @@ def get_quests():
     return cursor.fetchall()  # Fetch all rows from the table
 
 # Function to append a user to the scorer column
-def append_scorer(quest_id: int, user_name: str) -> str:
+def append_scorer_and_proof(quest_id: int, user_name: str, proof_link: str) -> str:
     try:
-        # Get the current scorers for the quest
-        cursor.execute('SELECT scorer FROM quests WHERE id = ?', (quest_id,))
+        # Get the current scorers and proof links for the quest
+        cursor.execute('SELECT scorer, proof FROM quests WHERE id = ?', (quest_id,))
         row = cursor.fetchone()
         if not row:
             return f"Quest ID {quest_id} not found."
 
+        # Current scorers and proof data
         current_scorers = row[0] if row[0] else ""
-        
-        # Split the current scorers into a list and remove "Unclaimed" if present
+        current_proof = row[1] if row[1] else ""
+
+        # Split the current scorers into a list, removing "Unclaimed" if present
         scorers_list = [s.strip() for s in current_scorers.split(",") if s.strip() and s.strip().lower() != "unclaimed"]
-        
-        # Append the user to the scorer list if not already present
+
+        # Append the new scorer if not already present
         if user_name not in scorers_list:
             scorers_list.append(user_name)
             updated_scorers = ",".join(scorers_list)
-            
-            # Update the scorer list in the database
-            cursor.execute('''
-            UPDATE quests
-            SET scorer = ?
-            WHERE id = ?
-            ''', (updated_scorers, quest_id))
-            conn.commit()
-            
-            return f"{user_name} successfully added as a scorer for quest ID {quest_id}."
         else:
-            return f"{user_name} is already a scorer for quest ID {quest_id}."
+            updated_scorers = current_scorers
+
+        # Append the proof link if it's not already present
+        proof_list = [p.strip() for p in current_proof.split(",") if p.strip()]
+        if proof_link not in proof_list:
+            proof_list.append(proof_link)
+            updated_proof = ",".join(proof_list)
+        else:
+            updated_proof = current_proof
+
+        # Update the scorer and proof columns in the database
+        cursor.execute('''
+        UPDATE quests
+        SET scorer = ?, proof = ?
+        WHERE id = ?
+        ''', (updated_scorers, updated_proof, quest_id))
+        conn.commit()
+
+        return f"{user_name} successfully added as a scorer and proof link added for quest ID {quest_id}."
     except sqlite3.Error as e:
-        return f"An error occurred while updating the scorer: {e}"
+        return f"An error occurred while updating the scorer and proof: {e}"
+
 
 # Function to submit proof for a quest in SQLite
 def submit_proof(quest_id: int, user_name: str, proof_link: str) -> str:
